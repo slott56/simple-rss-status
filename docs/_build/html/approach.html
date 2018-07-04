@@ -16,6 +16,7 @@
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Software Architecture" href="architecture.html" />
     <link rel="prev" title="Welcome to Simple RSS Status’s documentation!" href="index.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -32,7 +33,7 @@
           <div class="body" role="main">
             
   <div class="section" id="approach">
-<h1>Approach<a class="headerlink" href="#approach" title="Permalink to this headline">¶</a></h1>
+<span id="id1"></span><h1>Approach<a class="headerlink" href="#approach" title="Permalink to this headline">¶</a></h1>
 <p>We start with some previously saved history, <span class="math notranslate nohighlight">\(S_t\)</span> for some time, <span class="math notranslate nohighlight">\(t\)</span>. The base time, <span class="math notranslate nohighlight">\(t=0\)</span> will
 have an empty set of history, <span class="math notranslate nohighlight">\(S_0 = \emptyset\)</span>. A blank slate.</p>
 <p>Each day, we’re going to do three things.</p>
@@ -50,20 +51,23 @@ The idea is that <span class="math notranslate nohighlight">\(t\)</span> is mono
 <li>Use <strong>one master file</strong> and keep updating that file.</li>
 <li>Use <strong>a collection of files</strong> on a daily basis.</li>
 </ul>
-<p>The “One Master File” approach is simple. You look in the file. You have the saved history and the recent changes.
-It’s awkward to debug and impossible to audit without a lot of additional information.</p>
-<p>The “Collection of Files” approach creates a lot of small files. However, it’s trivial to audit.</p>
+<p>The “One Master File” approach is appealing. You look in the file. You have the saved history and the recent changes.
+It’s awkward to debug and impossible to audit without a lot of additional information.
+This is the ideal for a highly-polished end-user-friendly desktop application. It’s – perhaps – a goal.
+Sadly, it’s not very simple to implement because intermediate state change information is lost.</p>
+<p>The “Collection of Files” approach creates a lot of small files. While it’s bulky, it’s trivial to audit.
+There are a lot of simple files written using a number of simple rules.</p>
 <p>The idea is this.</p>
 <p>Each day will have a folder with a name that follows the YYYYMMDD pattern: <code class="docutils literal notranslate"><span class="pre">20180702</span></code> for example.</p>
-<p>Inside that folder, there will be three files:</p>
-<ul class="simple">
+<p>Inside each day’s unique folder, there will be three files:</p>
+<ol class="arabic simple">
 <li><code class="file docutils literal notranslate"><span class="pre">20180702/daily.csv</span></code> This is the daily download of RSS data, parsed and saved as a CSV file.
 This is <span class="math notranslate nohighlight">\(D_t\)</span></li>
 <li><code class="file docutils literal notranslate"><span class="pre">20180702/new.csv</span></code> This is the items which are new. <span class="math notranslate nohighlight">\(N_t = D_t - S_{t-1}\)</span></li>
 <li><code class="file docutils literal notranslate"><span class="pre">20180702/saved.csv</span></code> This is the accumulated history of items seen so far.
 It’s built as <span class="math notranslate nohighlight">\(S_{t} = D_t \cup S_{t-1}\)</span> each day.
 It can also be thought of as <span class="math notranslate nohighlight">\(S_{t} = \bigcup_t D_t\)</span>, the union of all previous daily files.</li>
-</ul>
+</ol>
 </div>
 </div>
 
@@ -85,6 +89,7 @@ It can also be thought of as <span class="math notranslate nohighlight">\(S_{t} 
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
       <li>Previous: <a href="index.html" title="previous chapter">Welcome to Simple RSS Status’s documentation!</a></li>
+      <li>Next: <a href="architecture.html" title="next chapter">Software Architecture</a></li>
   </ul></li>
 </ul>
 </div>

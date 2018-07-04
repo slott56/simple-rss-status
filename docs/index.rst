@@ -19,6 +19,7 @@ Contents:
    :maxdepth: 2
 
    approach
+   architecture
 
 Indices and tables
 ==================
