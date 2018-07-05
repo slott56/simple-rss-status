@@ -40,12 +40,13 @@ have an empty set of history, <span class="math notranslate nohighlight">\(S_0 =
 <ol class="arabic simple">
 <li>Get the daily RSS feed, we can call it <span class="math notranslate nohighlight">\(D_t\)</span> for some time, <span class="math notranslate nohighlight">\(t &gt; 0\)</span>.
 The idea is that <span class="math notranslate nohighlight">\(t\)</span> is monotonically increasing.</li>
-<li>Compare the daily feed with saved history to see what’s new. This is <span class="math notranslate nohighlight">\(D_t - S_{t-1}\)</span>.</li>
+<li>Compare the daily feed with saved history to see what’s new. This is <span class="math notranslate nohighlight">\(D_t - S_{t-1}\)</span>.
+It’s also <span class="math notranslate nohighlight">\(D_t = \{d \in D_t \colon d \notin S_{t-1} \}\)</span></li>
 <li>Update the saved history. This is <span class="math notranslate nohighlight">\(S_{t} = D_t \cup S_{t-1}\)</span>.</li>
 </ol>
 <p>As a practical matter, the time parameter, <span class="math notranslate nohighlight">\(t\)</span>, is the current day.</p>
-<div class="section" id="implementation-details">
-<h2>Implementation Details<a class="headerlink" href="#implementation-details" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="core-file-collection">
+<h2>Core File Collection<a class="headerlink" href="#core-file-collection" title="Permalink to this headline">¶</a></h2>
 <p>We’ll need to save the data. We have two overall approaches to this</p>
 <ul class="simple">
 <li>Use <strong>one master file</strong> and keep updating that file.</li>
@@ -68,6 +69,50 @@ This is <span class="math notranslate nohighlight">\(D_t\)</span></li>
 It’s built as <span class="math notranslate nohighlight">\(S_{t} = D_t \cup S_{t-1}\)</span> each day.
 It can also be thought of as <span class="math notranslate nohighlight">\(S_{t} = \bigcup_t D_t\)</span>, the union of all previous daily files.</li>
 </ol>
+<p>The naming pattern of year-month-day is easy to visualize and reasonably popular.</p>
+<p>A common alternative is to use year-week-dow: <code class="docutils literal notranslate"><span class="pre">2018271</span></code> is the 2018, 27th week, 1st day. This
+makes it easier to clean out files that are over a week old and no longer useful for debugging
+or audit purposes.</p>
+</div>
+<div class="section" id="multiple-dimensions">
+<h2>Multiple Dimensions<a class="headerlink" href="#multiple-dimensions" title="Permalink to this headline">¶</a></h2>
+<p>The focus above is on comparing a – single – daily extract with history. The file paths
+reflect date and state on a given date.</p>
+<p>The user story emphasizes multiple feeds. This leads to the following understanding of
+the data:</p>
+<img alt="_images/dimensions.png" src="_images/dimensions.png" />
+<p>A given item has two parents: the date and the RSS channel it came from.
+The two parents are independent dimensions – there’s no inherent hierarchical relationship between them.</p>
+<p>The OS file system, however, is hierarchical, forcing us to impose an arbitrary relationship between
+channels and dates. There are two choices.</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">channel</span> <span class="pre">/</span> <span class="pre">date</span> <span class="pre">/</span> <span class="pre">*.csv</span></code> Each channel folder has a long string of date-based folders.
+Within each date’s folder are the relevant files. This makes it easy to see evolution of
+data within a channel.</li>
+<li><code class="docutils literal notranslate"><span class="pre">date</span> <span class="pre">/</span> <span class="pre">channel</span> <span class="pre">/</span> <span class="pre">*.csv</span></code> Each date has a collection of channel folders. Within each channel folder
+are the files for the given date and channel combination. This makes it easier to overview
+all channels on a given date.</li>
+</ul>
+<p>The “date-on-top” organization makes cleanup easier. Removing all files from the previous month (or previous
+week if using year-week-day) is trivial.</p>
+<p>The “channel-on-top” organization makes cleanup awkward because each channel must be cleaned separately.</p>
+</div>
+<div class="section" id="which-date">
+<h2>Which Date?<a class="headerlink" href="#which-date" title="Permalink to this headline">¶</a></h2>
+<p>We have an interesting question regarding the applicable date for our files.</p>
+<p>Each RSS channel has a <code class="docutils literal notranslate"><span class="pre">lastBuildDate</span></code> tag with a time stamp for the RSS content.</p>
+<p>Which date do we use?</p>
+<ul class="simple">
+<li>The date we ran our software?</li>
+<li>The date provided in the RSS feed?</li>
+</ul>
+<p>If we use the RSS date, and an RSS feed is stale, we’ll tend to overwrite the same file
+with old data. There won’t be any easy way to check for staleness, though, because
+our application will overwrite an old file with old data. We can check the OS last-modified-date
+to see if we’re overwriting old files.</p>
+<p>If we use the date we actually run our software, we’ll see that the file isn’t changing.
+A file with a name like <code class="docutils literal notranslate"><span class="pre">20180702/channel/new.csv</span></code> will have reflect when we gathered the data. The content
+of the file may match the file from <code class="docutils literal notranslate"><span class="pre">20180701/channel/new.csv</span></code> showing that the feed is stale.</p>
 </div>
 </div>
 
@@ -80,7 +125,9 @@ It can also be thought of as <span class="math notranslate nohighlight">\(S_{t} 
   <h3><a href="index.html">Table Of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Approach</a><ul>
-<li><a class="reference internal" href="#implementation-details">Implementation Details</a></li>
+<li><a class="reference internal" href="#core-file-collection">Core File Collection</a></li>
+<li><a class="reference internal" href="#multiple-dimensions">Multiple Dimensions</a></li>
+<li><a class="reference internal" href="#which-date">Which Date?</a></li>
 </ul>
 </li>
 </ul>

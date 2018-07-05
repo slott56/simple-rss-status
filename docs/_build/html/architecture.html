@@ -16,6 +16,7 @@
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Expansions" href="expansion.html" />
     <link rel="prev" title="Approach" href="approach.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -34,31 +35,396 @@
   <div class="section" id="software-architecture">
 <h1>Software Architecture<a class="headerlink" href="#software-architecture" title="Permalink to this headline">¶</a></h1>
 <p>In the <a class="reference internal" href="approach.html#approach"><span class="std std-ref">Approach</span></a> section, we identified three steps.
-When we have multiple processing steps, we need to define multiple functions.</p>
+When we have multiple processing steps, we need to define multiple functions to implement
+those steps. The mapping isn’t exact because we’re refining abstractions into concrete
+expressions.</p>
 <ol class="arabic simple">
 <li>The core RSS reader function. Pragmatically, this tends to expand into more than one function
 so we can separate the core XML parsing from add-on parsing that’s unique to the data we’re working with.
 For example, decomposing the title isn’t about RSS in general, it’s about this specific problem domain.</li>
-<li>A saved state getter. There’s not much to this, but it’s important to have the chalky slate where each day’s updates are recorded.</li>
-<li>The change report.</li>
-<li>A saved state writer.</li>
+<li>A saved state getter.
+There’s not much to this, but it’s important to recover the information
+from the chalky slate where each day’s updates are recorded.</li>
 </ol>
-<p>Let’s rough out the overall plan as conceptual psuedo-code:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">todays_data</span> <span class="o">=</span> <span class="n">xml_reader</span><span class="p">(</span><span class="s2">&quot;Some_RSS_URL&quot;</span><span class="p">)</span>
-<span class="n">saved_data</span> <span class="o">=</span> <span class="n">csv_reader</span><span class="p">(</span><span class="n">yesterday_path</span> <span class="o">/</span> <span class="s2">&quot;save.csv&quot;</span><span class="p">)</span>
+<ol class="arabic simple" start="4">
+<li>A saved state writer. This can be pressed into service to write all of the files,
+since they’re structurally identical.</li>
+</ol>
+<p>Let’s rough out the overall plan as conceptual pseudo-code shoing the original approach
+steps and how they’ve become functions that map arguments to results.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">yesterdays_path</span><span class="p">,</span> <span class="n">todays_path</span> <span class="o">=</span> <span class="n">path_maker</span><span class="p">(</span><span class="s2">&quot;Some_RSS_URL&quot;</span><span class="p">)</span>
 
-<span class="n">new_data</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">item</span>
-    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">todays_data</span>
-        <span class="k">if</span> <span class="n">item</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">saved_data</span><span class="p">)</span>
-<span class="n">all_data</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">saved_data</span><span class="p">)</span> <span class="o">|</span> <span class="nb">set</span><span class="p">(</span><span class="n">new_data</span><span class="p">)</span>
+<span class="c1"># 1. Get Daily RSS Feed</span>
+<span class="n">todays_data</span> <span class="o">=</span> <span class="n">xml_reader</span><span class="p">(</span><span class="s2">&quot;Some_RSS_URL&quot;</span><span class="p">)</span>
+<span class="n">saved_data</span> <span class="o">=</span> <span class="n">csv_load</span><span class="p">(</span><span class="n">yesterday_path</span> <span class="o">/</span> <span class="s2">&quot;save.csv&quot;</span><span class="p">)</span>
 
-<span class="n">csv_writer</span><span class="p">(</span><span class="n">new_data</span><span class="p">,</span> <span class="n">today_path</span> <span class="o">/</span> <span class="s2">&quot;new.csv&quot;</span><span class="p">)</span>
-<span class="n">csv_writer</span><span class="p">(</span><span class="n">todays_data</span><span class="p">,</span> <span class="n">today_path</span> <span class="o">/</span> <span class="s2">&quot;daily.csv&quot;</span><span class="p">)</span>
-<span class="n">csv_write</span><span class="p">(</span><span class="n">all_data</span><span class="p">,</span> <span class="n">today_path</span> <span class="o">/</span> <span class="s2">&quot;save.csv&quot;</span><span class="p">)</span>
+<span class="c1"># 2. Compare with saved history</span>
+<span class="n">new_data</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">todays_data</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">saved_data</span><span class="p">)</span>
+
+<span class="c1"># 3. Update saved history</span>
+<span class="n">all_data</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">todays_data</span><span class="p">)</span> <span class="o">|</span> <span class="nb">set</span><span class="p">(</span><span class="n">saved_data</span><span class="p">)</span>
+
+<span class="n">csv_dump</span><span class="p">(</span><span class="n">new_data</span><span class="p">,</span> <span class="n">today_path</span> <span class="o">/</span> <span class="s2">&quot;new.csv&quot;</span><span class="p">)</span>
+<span class="n">csv_dump</span><span class="p">(</span><span class="n">todays_data</span><span class="p">,</span> <span class="n">today_path</span> <span class="o">/</span> <span class="s2">&quot;daily.csv&quot;</span><span class="p">)</span>
+<span class="n">csv_dump</span><span class="p">(</span><span class="n">all_data</span><span class="p">,</span> <span class="n">today_path</span> <span class="o">/</span> <span class="s2">&quot;save.csv&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>This core processing sequence can be performed for any number of RSS feeds. The idea is
+<p>The above is purely conceptual. The idea is to outline a possible approach. As we delve into
+details, we’ll uncover places where this might be less than perfect. The final code will
+differ based on the things we learn along the way.</p>
+<p>This core processing sequence can be performed for any number of RSS channels. The idea is
 to capture as many as necessary.</p>
+<div class="section" id="some-design-patterns">
+<h2>Some Design Patterns<a class="headerlink" href="#some-design-patterns" title="Permalink to this headline">¶</a></h2>
+<p>One overall idea that is helpful is the <strong>Extract-Transform-Load</strong> (ETL) pipeline.
+This application involves ETL in miniature:</p>
+<ul>
+<li><p class="first">Extract raw data from it’s XML representation to build Python objects.</p>
+</li>
+<li><p class="first">Transform the raw data from one class of Python objects to another class of objects.</p>
+</li>
+<li><p class="first">Load the transformed data into a “database”. In this case, a bunch of directories
+and files. The conceptual “database load” is implemented as function to “dump” the data
+in CSV notation.</p>
+<p>The terminology change is awkward, but Python uses “dump” and “load”
+as the verbs of choice for dumping python objects into an external file and loading
+Python objects from an external file.</p>
+</li>
+</ul>
+<p>Additionally, we’re working with several examples of <strong>Serialization</strong>. The concept
+is to create a series of bytes that represent a Python object. The source data
+was serialized in XML notation; we parse that to recover Python objects. The working
+data is serialized in CSV notation; we load and dump those files.</p>
+<span class="target" id="module-xml_parsing"></span></div>
+<div class="section" id="core-data-structures">
+<h2>Core Data Structures<a class="headerlink" href="#core-data-structures" title="Permalink to this headline">¶</a></h2>
+<p>We have to address some technical nuance before going forward.</p>
+<div class="admonition important">
+<p class="first admonition-title">Important</p>
+<p>Python sets work with immutable objects.</p>
+<p class="last">The <code class="docutils literal notranslate"><span class="pre">csv</span></code> module works with mutable List or Dict objects for each row.</p>
+</div>
+<p>This will be aggravating.</p>
+<div class="sidebar">
+<p class="first sidebar-title">Mutability</p>
+<p>There’s a firm and abiding distinction between mutable and immutable data
+structures in Python.</p>
+<ul>
+<li><p class="first">Immutable: strings, numbers, tuples. These are objects with an unchanging
+internal state. We can’t change the value of the integer 13.</p>
+</li>
+<li><p class="first">Mutable: Lists, Dicts, instances of classes we define. These are objects
+with an internal state we can adjust.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">some_list</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">some_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">some_list</span>
+<span class="go">[1, 2, 3, 42]</span>
+</pre></div>
+</div>
+<p>The list object, <code class="docutils literal notranslate"><span class="pre">some_list</span></code> was mutated by the <code class="xref py py-meth docutils literal notranslate"><span class="pre">append()</span></code> method.</p>
+</li>
+</ul>
+<p>“But wait,” you cry out. “What about this?”</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">some_number</span> <span class="o">=</span> <span class="mi">13</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">some_number</span> <span class="o">=</span> <span class="n">some_number</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">some_number</span>
+<span class="go">14</span>
+</pre></div>
+</div>
+<p>“We mutated <code class="docutils literal notranslate"><span class="pre">some_number</span></code>!”</p>
+<p>Well, actually…</p>
+<p class="last">The object, <code class="docutils literal notranslate"><span class="pre">13</span></code> did not mutate. The expression <code class="docutils literal notranslate"><span class="pre">some_number</span> <span class="pre">+</span> <span class="pre">1</span></code> is working with two
+immutable objects. A new immutable object, <code class="docutils literal notranslate"><span class="pre">14</span></code>, was created by the expression.
+This new immutable object was then assigned the name <code class="docutils literal notranslate"><span class="pre">some_number</span></code>. The old immutable <code class="docutils literal notranslate"><span class="pre">13</span></code>
+object is no longer being used.</p>
+</div>
+<p>We have two choices for working with the mutable results of reading CSV files.</p>
+<ul class="simple">
+<li>Implement our own versions of set subtraction and set union that work
+with mutable objects. This has the advantage of enabling the huge flexibility
+inherent in working with the <code class="xref py py-class docutils literal notranslate"><span class="pre">csv.DictReader</span></code>: each row becomes
+a dictionary with an indefinition collection of keys.</li>
+<li>Transmogrify the mutable objects into immutable data structures.
+(The technical term is “coerce”, but I like transmogrification.)
+While this tends to limit our flexibility somewhat, it saves us from
+implementing set operations.</li>
+</ul>
+<p>The transmogrification approach leads us to building a named tuple object
+for each CSV row.</p>
+<dl class="class">
+<dt id="xml_parsing.SourceRSS">
+<em class="property">class </em><code class="descclassname">xml_parsing.</code><code class="descname">SourceRSS</code><a class="reference internal" href="_modules/xml_parsing.html#SourceRSS"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xml_parsing.SourceRSS" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extract of raw RSS data</p>
+<dl class="attribute">
+<dt id="xml_parsing.SourceRSS.description">
+<code class="descname">description</code><a class="headerlink" href="#xml_parsing.SourceRSS.description" title="Permalink to this definition">¶</a></dt>
+<dd><p>The description</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="xml_parsing.SourceRSS.link">
+<code class="descname">link</code><a class="headerlink" href="#xml_parsing.SourceRSS.link" title="Permalink to this definition">¶</a></dt>
+<dd><p>The link</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="xml_parsing.SourceRSS.pubDate">
+<code class="descname">pubDate</code><a class="headerlink" href="#xml_parsing.SourceRSS.pubDate" title="Permalink to this definition">¶</a></dt>
+<dd><p>The publication date</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="xml_parsing.SourceRSS.title">
+<code class="descname">title</code><a class="headerlink" href="#xml_parsing.SourceRSS.title" title="Permalink to this definition">¶</a></dt>
+<dd><p>The title</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="xml_parsing.ExpandedRSS">
+<em class="property">class </em><code class="descclassname">xml_parsing.</code><code class="descname">ExpandedRSS</code><a class="reference internal" href="_modules/xml_parsing.html#ExpandedRSS"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xml_parsing.ExpandedRSS" title="Permalink to this definition">¶</a></dt>
+<dd><p>Data expanded by the <a class="reference internal" href="#xml_parsing.title_transform" title="xml_parsing.title_transform"><code class="xref py py-func docutils literal notranslate"><span class="pre">title_transform()</span></code></a> function.</p>
+<p>Note that the names of the fields in this class will be the column
+titles on saved CSV files. Any change here will be reflected in the files
+created.</p>
+<dl class="attribute">
+<dt id="xml_parsing.ExpandedRSS.description">
+<code class="descname">description</code><a class="headerlink" href="#xml_parsing.ExpandedRSS.description" title="Permalink to this definition">¶</a></dt>
+<dd><p>The description</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="xml_parsing.ExpandedRSS.docket">
+<code class="descname">docket</code><a class="headerlink" href="#xml_parsing.ExpandedRSS.docket" title="Permalink to this definition">¶</a></dt>
+<dd><p>The parsed docket from the title</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="xml_parsing.ExpandedRSS.link">
+<code class="descname">link</code><a class="headerlink" href="#xml_parsing.ExpandedRSS.link" title="Permalink to this definition">¶</a></dt>
+<dd><p>The link</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="xml_parsing.ExpandedRSS.parties_title">
+<code class="descname">parties_title</code><a class="headerlink" href="#xml_parsing.ExpandedRSS.parties_title" title="Permalink to this definition">¶</a></dt>
+<dd><p>The parsed parties from the title</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="xml_parsing.ExpandedRSS.pubDate">
+<code class="descname">pubDate</code><a class="headerlink" href="#xml_parsing.ExpandedRSS.pubDate" title="Permalink to this definition">¶</a></dt>
+<dd><p>The publication date</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="xml_parsing.ExpandedRSS.title">
+<code class="descname">title</code><a class="headerlink" href="#xml_parsing.ExpandedRSS.title" title="Permalink to this definition">¶</a></dt>
+<dd><p>The title</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="xml-parsing">
+<h2>XML Parsing<a class="headerlink" href="#xml-parsing" title="Permalink to this headline">¶</a></h2>
+<p>XML parsing is handled gracefully by Python’s <code class="xref py py-mod docutils literal notranslate"><span class="pre">xml</span></code> package. There are several
+parses, the <code class="xref py py-mod docutils literal notranslate"><span class="pre">xml.etree</span></code> is particularly nice, and provides a wealth of features.</p>
+<dl class="function">
+<dt id="xml_parsing.xml_reader">
+<code class="descclassname">xml_parsing.</code><code class="descname">xml_reader</code><span class="sig-paren">(</span><em>url: str</em><span class="sig-paren">)</span> &#x2192; List[xml_parsing.SourceRSS]<a class="reference internal" href="_modules/xml_parsing.html#xml_reader"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xml_parsing.xml_reader" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extract RSS data given a URL to read.</p>
+<p>The root document is the <code class="docutils literal notranslate"><span class="pre">&lt;rss&gt;</span></code> tag which has a single <code class="docutils literal notranslate"><span class="pre">&lt;channel&gt;</span></code> tag.
+The <code class="docutils literal notranslate"><span class="pre">&lt;channel&gt;</span></code> has some overall attributes, but contains a sequence
+of <code class="docutils literal notranslate"><span class="pre">&lt;item&gt;</span></code> tags.</p>
+<p>This will gather “title”, “link”, “description”, and “pubDate” from each item
+and build a <a class="reference internal" href="#xml_parsing.SourceRSS" title="xml_parsing.SourceRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">SourceRSS</span></code></a> object.</p>
+<p>It might be helpful to return the overall channel properties along with
+the list of items.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>url</strong> – URL to read.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">All of the SourceRSS from the channel of the feed, List[SourceRSS].</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="creating-working-paths">
+<h2>Creating Working Paths<a class="headerlink" href="#creating-working-paths" title="Permalink to this headline">¶</a></h2>
+<p>We have two dimensions to the paths. The <a class="reference internal" href="#xml_parsing.path_maker" title="xml_parsing.path_maker"><code class="xref py py-func docutils literal notranslate"><span class="pre">path_maker()</span></code></a> function will
+honor this by using a name from the URL and today’s date.</p>
+<dl class="function">
+<dt id="xml_parsing.path_maker">
+<code class="descclassname">xml_parsing.</code><code class="descname">path_maker</code><span class="sig-paren">(</span><em>url: str</em>, <em>now: datetime.datetime = None</em>, <em>format: str = '%Y%m%d'</em><span class="sig-paren">)</span> &#x2192; pathlib.Path<a class="reference internal" href="_modules/xml_parsing.html#path_maker"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xml_parsing.path_maker" title="Permalink to this definition">¶</a></dt>
+<dd><p>Builds a Path from today’s date and the base name of the URL.</p>
+<p>The default format is “%Y%m%d” to transform the date to a YYYYmmdd string.
+An alternative can be “”%Y%W%w” to create a  YYYYWWw string,
+where WW is the week of the year and w is the day of the week.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">xml_parsing</span> <span class="k">import</span> <span class="n">path_maker</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">datetime</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2018</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">str</span><span class="p">(</span><span class="n">path_maker</span><span class="p">(</span><span class="s2">&quot;https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl&quot;</span><span class="p">,</span> <span class="n">now</span><span class="p">))</span>
+<span class="go">&#39;20180910/rss_outside&#39;</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>url</strong> – An RSS-feed URL.</li>
+<li><strong>now</strong> – Optional date/time object. Defaults to datetime.datetime.now().</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">A Path with the date string / base name from the URL.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<p>What about yesterday’s files?  We can’t simply subtract one day from today’s date.
+For that to work, we’d have to religiously run this <strong>every single day</strong>. That’s unreasonable.
+What’s easier is locating the most recent date which contains files for a given channel.</p>
+<dl class="function">
+<dt id="xml_parsing.find_yesterday">
+<code class="descclassname">xml_parsing.</code><code class="descname">find_yesterday</code><span class="sig-paren">(</span><em>directory: pathlib.Path</em>, <em>url: str</em>, <em>date_pattern: str = '[0-9]*'</em><span class="sig-paren">)</span> &#x2192; pathlib.Path<a class="reference internal" href="_modules/xml_parsing.html#find_yesterday"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xml_parsing.find_yesterday" title="Permalink to this definition">¶</a></dt>
+<dd><p>We need to search for the most recent previous entry. While we can hope for
+dependably running this every day, that’s a difficult thing to guarantee.</p>
+<p>It’s much more reliable to look for the most recent date which
+contains files for a given channel. This means</p>
+<p>Example. Here’s two dates. One date has one channel, the other has two channels.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">20180630</span><span class="o">/</span><span class="n">one_channel</span><span class="o">/</span><span class="n">daily</span><span class="o">.</span><span class="n">csv</span>
+<span class="mi">20180630</span><span class="o">/</span><span class="n">one_channel</span><span class="o">/</span><span class="n">new</span><span class="o">.</span><span class="n">csv</span>
+<span class="mi">20180630</span><span class="o">/</span><span class="n">one_channel</span><span class="o">/</span><span class="n">save</span><span class="o">.</span><span class="n">csv</span>
+<span class="mi">20180701</span><span class="o">/</span><span class="n">one_channel</span><span class="o">/</span><span class="n">daily</span><span class="o">.</span><span class="n">csv</span>
+<span class="mi">20180701</span><span class="o">/</span><span class="n">one_channel</span><span class="o">/</span><span class="n">new</span><span class="o">.</span><span class="n">csv</span>
+<span class="mi">20180701</span><span class="o">/</span><span class="n">one_channel</span><span class="o">/</span><span class="n">save</span><span class="o">.</span><span class="n">csv</span>
+<span class="mi">20180701</span><span class="o">/</span><span class="n">another_channel</span><span class="o">/</span><span class="n">daily</span><span class="o">.</span><span class="n">csv</span>
+<span class="mi">20180701</span><span class="o">/</span><span class="n">another_channel</span><span class="o">/</span><span class="n">new</span><span class="o">.</span><span class="n">csv</span>
+<span class="mi">20180701</span><span class="o">/</span><span class="n">another_channel</span><span class="o">/</span><span class="n">save</span><span class="o">.</span><span class="n">csv</span>
+</pre></div>
+</div>
+<p>If there’s nothing available, returns None.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>directory</strong> – The base directory to search</li>
+<li><strong>url</strong> – The full URL from which we can get the base name</li>
+<li><strong>date_pattern</strong> – Most of the time, the interesting filenames will begin with a digit
+If the file name pattern is changed, however, this can be used to match dates,
+and exclude non-date files that might be confusing.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">A Path with the date string / base name from the URL or None.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="saving-and-recovering-csv-state">
+<h2>Saving and Recovering CSV State<a class="headerlink" href="#saving-and-recovering-csv-state" title="Permalink to this headline">¶</a></h2>
+<p>These two functions will save and restore collections of <a class="reference internal" href="#xml_parsing.ExpandedRSS" title="xml_parsing.ExpandedRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExpandedRSS</span></code></a> objects.
+We use the names “dump” and “load” to be consistent with other serialization packages.
+We could use <code class="docutils literal notranslate"><span class="pre">json.dump()</span></code> or <code class="docutils literal notranslate"><span class="pre">yaml.dump()</span></code> instead of writing in CSV notation.</p>
+<dl class="function">
+<dt id="xml_parsing.csv_dump">
+<code class="descclassname">xml_parsing.</code><code class="descname">csv_dump</code><span class="sig-paren">(</span><em>data: List[xml_parsing.ExpandedRSS], output_path: pathlib.Path</em><span class="sig-paren">)</span> &#x2192; None<a class="reference internal" href="_modules/xml_parsing.html#csv_dump"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xml_parsing.csv_dump" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save expanded data to a file, given the Path.</p>
+<p>Note that the headers are the field names from the ExpandedRSS class definition.
+This assures us that all fields will be written properly.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> – List of <a class="reference internal" href="#xml_parsing.ExpandedRSS" title="xml_parsing.ExpandedRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExpandedRSS</span></code></a> items, built by <a class="reference internal" href="#xml_parsing.title_transform" title="xml_parsing.title_transform"><code class="xref py py-func docutils literal notranslate"><span class="pre">title_transform()</span></code></a>.</li>
+<li><strong>output_path</strong> – Path to which to write the file.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="xml_parsing.csv_load">
+<code class="descclassname">xml_parsing.</code><code class="descname">csv_load</code><span class="sig-paren">(</span><em>input_path: pathlib.Path</em><span class="sig-paren">)</span> &#x2192; List[xml_parsing.ExpandedRSS]<a class="reference internal" href="_modules/xml_parsing.html#csv_load"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xml_parsing.csv_load" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recover expanded data from a file, given a Path.</p>
+<p>Note that the headers <strong>must be</strong> the field names from the ExpandedRSS class definition.
+If their isn’t a trivial match, then this won’t read properly.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>input_path</strong> – Path from which to read the file.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">List of ExpandedRSS objects used to compare previous day’s feed
+with today’s feed.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="transformations">
+<h2>Transformations<a class="headerlink" href="#transformations" title="Permalink to this headline">¶</a></h2>
+<p>Currently, we only have one transformation, from <a class="reference internal" href="#xml_parsing.SourceRSS" title="xml_parsing.SourceRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">SourceRSS</span></code></a> to
+<a class="reference internal" href="#xml_parsing.ExpandedRSS" title="xml_parsing.ExpandedRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExpandedRSS</span></code></a>.</p>
+<dl class="function">
+<dt id="xml_parsing.title_transform">
+<code class="descclassname">xml_parsing.</code><code class="descname">title_transform</code><span class="sig-paren">(</span><em>items: List[xml_parsing.SourceRSS]</em><span class="sig-paren">)</span> &#x2192; List[xml_parsing.ExpandedRSS]<a class="reference internal" href="_modules/xml_parsing.html#title_transform"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xml_parsing.title_transform" title="Permalink to this definition">¶</a></dt>
+<dd><p>A “transformation”: this will parse titles for court docket RSS feeds.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">xml_parsing</span> <span class="k">import</span> <span class="n">title_transform</span><span class="p">,</span> <span class="n">SourceRSS</span><span class="p">,</span> <span class="n">ExpandedRSS</span>
+</pre></div>
+</div>
+<p>The data is a list witha  single document [SourceRSS()]</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="p">[</span>
+<span class="gp">... </span><span class="n">SourceRSS</span><span class="p">(</span>
+<span class="gp">... </span>   <span class="n">title</span><span class="o">=</span><span class="s1">&#39;1:15-cv-00791 SAVAGE  v. BURWELL et al&#39;</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">link</span><span class="o">=</span><span class="s1">&#39;https://ecf.dcd.uscourts.gov/cgi-bin/DktRpt.pl?172013&#39;</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">description</span><span class="o">=</span><span class="s1">&#39;[Reply to opposition to motion] (&lt;a href=&quot;https://ecf.dcd.uscourts.gov/doc1/04516660233?caseid=172013&amp;de_seq_num=555&quot; &gt;137&lt;/a&gt;)&#39;</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">pubDate</span><span class="o">=</span><span class="s1">&#39;Thu, 05 Jul 2018 06:26:07 GMT&#39;</span>
+<span class="gp">... </span><span class="p">),</span>
+<span class="gp">... </span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">title_transform</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="go">[ExpandedRSS(title=&#39;1:15-cv-00791 SAVAGE  v. BURWELL et al&#39;, link=&#39;https://ecf.dcd.uscourts.gov/cgi-bin/DktRpt.pl?172013&#39;, description=&#39;[Reply to opposition to motion] (&lt;a href=&quot;https://ecf.dcd.uscourts.gov/doc1/04516660233?caseid=172013&amp;de_seq_num=555&quot; &gt;137&lt;/a&gt;)&#39;, pubDate=&#39;Thu, 05 Jul 2018 06:26:07 GMT&#39;, docket=&#39;15-cv-00791&#39;, parties_title=&#39;SAVAGE  v. BURWELL et al&#39;)]</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>items</strong> – A list of <a class="reference internal" href="#xml_parsing.SourceRSS" title="xml_parsing.SourceRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">SourceRSS</span></code></a> items built by <a class="reference internal" href="#xml_parsing.xml_reader" title="xml_parsing.xml_reader"><code class="xref py py-func docutils literal notranslate"><span class="pre">xml_reader()</span></code></a></td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">A new list of <a class="reference internal" href="#xml_parsing.ExpandedRSS" title="xml_parsing.ExpandedRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExpandedRSS</span></code></a>, with some additional attributes for each item.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<p>In the long run, there will be additional transformations.</p>
+<p>Adding transormations means this single function does too many things.
+The current design has two elements combined together.</p>
+<ol class="arabic simple">
+<li>Building a new list from individually transformed rows.</li>
+<li>Applying a single transformation process to create <a class="reference internal" href="#xml_parsing.ExpandedRSS" title="xml_parsing.ExpandedRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExpandedRSS</span></code></a> objects.</li>
+</ol>
+<p>In the longer run (see <a class="reference internal" href="expansion.html#expansions"><span class="std std-ref">Expansions</span></a>) this needs to be refactored to allow
+multiple transformation processes to be combined by an over-arching transformation pipeline.</p>
+</div>
 </div>
 
 
@@ -66,11 +432,25 @@ to capture as many as necessary.</p>
         </div>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper"><div class="relations">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Software Architecture</a><ul>
+<li><a class="reference internal" href="#some-design-patterns">Some Design Patterns</a></li>
+<li><a class="reference internal" href="#core-data-structures">Core Data Structures</a></li>
+<li><a class="reference internal" href="#xml-parsing">XML Parsing</a></li>
+<li><a class="reference internal" href="#creating-working-paths">Creating Working Paths</a></li>
+<li><a class="reference internal" href="#saving-and-recovering-csv-state">Saving and Recovering CSV State</a></li>
+<li><a class="reference internal" href="#transformations">Transformations</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
       <li>Previous: <a href="approach.html" title="previous chapter">Approach</a></li>
+      <li>Next: <a href="expansion.html" title="next chapter">Expansions</a></li>
   </ul></li>
 </ul>
 </div>

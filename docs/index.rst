@@ -20,6 +20,7 @@ Contents:
 
    approach
    architecture
+   expansion
 
 Indices and tables
 ==================
