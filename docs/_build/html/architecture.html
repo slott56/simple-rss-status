@@ -121,7 +121,7 @@ with an internal state we can adjust.</p>
 <span class="go">[1, 2, 3, 42]</span>
 </pre></div>
 </div>
-<p>The list object, <code class="docutils literal notranslate"><span class="pre">some_list</span></code> was mutated by the <code class="xref py py-meth docutils literal notranslate"><span class="pre">append()</span></code> method.</p>
+<p>The list object, <code class="docutils literal notranslate"><span class="pre">some_list</span></code>, was mutated by the <code class="xref py py-meth docutils literal notranslate"><span class="pre">append()</span></code> method.</p>
 </li>
 </ul>
 <p>“But wait,” you cry out. “What about this?”</p>
@@ -450,14 +450,21 @@ work with that. If there’s no recent file, this is all new. Welcome.</p>
 </table>
 </dd></dl>
 
-<p>This can lead to a main program like this:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">working_directory</span> <span class="o">=</span> <span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">&quot;rss_feed&quot;</span> <span class="o">/</span> <span class="s2">&quot;data&quot;</span>
-<span class="k">for</span> <span class="n">channel_url</span> <span class="ow">in</span> <span class="p">(</span>
-    <span class="s2">&quot;https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;https://ecf.nyed.uscourts.gov/cgi-bin/readyDockets.pl&quot;</span><span class="p">,</span>
-    <span class="c1"># More channels here.</span>
-<span class="p">):</span>
-    <span class="n">channel_processing</span><span class="p">(</span><span class="n">channel_url</span><span class="p">,</span> <span class="n">working_directory</span><span class="p">)</span>
+</div>
+<div class="section" id="processing-for-all-channels">
+<h2>Processing for All Channels<a class="headerlink" href="#processing-for-all-channels" title="Permalink to this headline">¶</a></h2>
+<p>We can have a main program like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="n">working_directory</span> <span class="o">=</span> <span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">&quot;rss_feed&quot;</span> <span class="o">/</span> <span class="s2">&quot;data&quot;</span>
+    <span class="k">for</span> <span class="n">channel_url</span> <span class="ow">in</span> <span class="p">(</span>
+        <span class="s2">&quot;https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;https://ecf.nyed.uscourts.gov/cgi-bin/readyDockets.pl&quot;</span><span class="p">,</span>
+        <span class="c1"># More channels here.</span>
+    <span class="p">):</span>
+        <span class="n">channel_processing</span><span class="p">(</span><span class="n">channel_url</span><span class="p">,</span> <span class="n">working_directory</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
 </pre></div>
 </div>
 <p>The configuration is relatively simple and easy-to-see because it’s right there in the script.</p>
@@ -482,6 +489,7 @@ we can use the <a class="reference external" href="http://click.pocoo.org/5/">ht
 <li><a class="reference internal" href="#saving-and-recovering-csv-state">Saving and Recovering CSV State</a></li>
 <li><a class="reference internal" href="#transformations">Transformations</a></li>
 <li><a class="reference internal" href="#composite-processing-for-one-channel">Composite Processing for One Channel</a></li>
+<li><a class="reference internal" href="#processing-for-all-channels">Processing for All Channels</a></li>
 </ul>
 </li>
 </ul>

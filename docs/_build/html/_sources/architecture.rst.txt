@@ -102,7 +102,7 @@ This will be aggravating.
             >>> some_list
             [1, 2, 3, 42]
 
-        The list object, ``some_list`` was mutated by the :meth:`append` method.
+        The list object, ``some_list``, was mutated by the :meth:`append` method.
 
     "But wait," you cry out. "What about this?"
 
@@ -205,17 +205,24 @@ The core channel processing is a function that captures data into CSV files.
 
 ..  autofunction:: rss_status.channel_processing
 
-This can lead to a main program like this:
+Processing for All Channels
+---------------------------
+
+We can have a main program like this:
 
 ::
 
-    working_directory = Path.home() / "rss_feed" / "data"
-    for channel_url in (
-        "https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl",
-        "https://ecf.nyed.uscourts.gov/cgi-bin/readyDockets.pl",
-        # More channels here.
-    ):
-        channel_processing(channel_url, working_directory)
+    def main():
+        working_directory = Path.home() / "rss_feed" / "data"
+        for channel_url in (
+            "https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl",
+            "https://ecf.nyed.uscourts.gov/cgi-bin/readyDockets.pl",
+            # More channels here.
+        ):
+            channel_processing(channel_url, working_directory)
+
+    if __name__ == "__main__":
+        main()
 
 The configuration is relatively simple and easy-to-see because it's right there in the script.
 

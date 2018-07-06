@@ -34,22 +34,31 @@
             
   <div class="section" id="approach">
 <span id="id1"></span><h1>Approach<a class="headerlink" href="#approach" title="Permalink to this headline">¶</a></h1>
-<p>We start with some previously saved history, <span class="math notranslate nohighlight">\(S_t\)</span> for some time, <span class="math notranslate nohighlight">\(t\)</span>. The base time, <span class="math notranslate nohighlight">\(t=0\)</span> will
-have an empty set of history, <span class="math notranslate nohighlight">\(S_0 = \emptyset\)</span>. A blank slate.</p>
+<p>We’ll be gathering a set of items, some of which are new at a given point in time, and
+others of which are old. We need to partition the set to show only the new ones.</p>
+<p>This means computing a set difference between items for time, <span class="math notranslate nohighlight">\(t\)</span>, that are distinct
+from items for all previous times, <span class="math notranslate nohighlight">\(p\)</span>, such that <span class="math notranslate nohighlight">\(p &lt; t\)</span>.</p>
+<p>We can formalize the daily set, <span class="math notranslate nohighlight">\(D_t = \{i_0, i_1, i_2, ...\}\)</span>, as a set of individual
+items, <span class="math notranslate nohighlight">\(i_0\)</span>, <span class="math notranslate nohighlight">\(i_1\)</span>, etc.</p>
+<p>The history is the union of all previous daily sets, <span class="math notranslate nohighlight">\(S_{t-1} = \bigcup_{p \leq t-1} D_p\)</span>.</p>
+<p>The interesting data, then, is <span class="math notranslate nohighlight">\(D_t - S_{t-1}\)</span>. That is, <span class="math notranslate nohighlight">\(D_t - \bigcup_{p \leq t-1} D_p\)</span>.
+This can be restated as <span class="math notranslate nohighlight">\(\{i \in D_t \colon i \notin \bigcup_{p \leq t-1} D_p \}\)</span></p>
+<p>Since we run this daily, a sensible optimization is to save the history, updating it each day.
+To do this, we can start with some previously saved history, <span class="math notranslate nohighlight">\(S_t\)</span>, for some time, <span class="math notranslate nohighlight">\(t\)</span>.
+The base time, <span class="math notranslate nohighlight">\(t=0\)</span> will have an empty set of history, <span class="math notranslate nohighlight">\(S_0 = \emptyset\)</span>. A blank slate.</p>
 <p>Each day, we’re going to do three things.</p>
 <ol class="arabic simple">
 <li>Get the daily RSS feed, we can call it <span class="math notranslate nohighlight">\(D_t\)</span> for some time, <span class="math notranslate nohighlight">\(t &gt; 0\)</span>.
 The idea is that <span class="math notranslate nohighlight">\(t\)</span> is monotonically increasing.</li>
-<li>Compare the daily feed with saved history to see what’s new. This is <span class="math notranslate nohighlight">\(D_t - S_{t-1}\)</span>.
-It’s also <span class="math notranslate nohighlight">\(D_t = \{d \in D_t \colon d \notin S_{t-1} \}\)</span></li>
+<li>Compare the daily feed with saved history to see what’s new. This is <span class="math notranslate nohighlight">\(D_t - S_{t-1}\)</span>.</li>
 <li>Update the saved history. This is <span class="math notranslate nohighlight">\(S_{t} = D_t \cup S_{t-1}\)</span>.</li>
 </ol>
 <p>As a practical matter, the time parameter, <span class="math notranslate nohighlight">\(t\)</span>, is the current day.</p>
 <div class="section" id="core-file-collection">
 <h2>Core File Collection<a class="headerlink" href="#core-file-collection" title="Permalink to this headline">¶</a></h2>
-<p>We’ll need to save the data. We have two overall approaches to this</p>
+<p>We have two overall approaches to saving a large and growing collection of data:</p>
 <ul class="simple">
-<li>Use <strong>one master file</strong> and keep updating that file.</li>
+<li>Use <strong>one master file</strong> and keep updating that file with new items.</li>
 <li>Use <strong>a collection of files</strong> on a daily basis.</li>
 </ul>
 <p>The “One Master File” approach is appealing. You look in the file. You have the saved history and the recent changes.
@@ -57,8 +66,8 @@ It’s awkward to debug and impossible to audit without a lot of additional info
 This is the ideal for a highly-polished end-user-friendly desktop application. It’s – perhaps – a goal.
 Sadly, it’s not very simple to implement because intermediate state change information is lost.</p>
 <p>The “Collection of Files” approach creates a lot of small files. While it’s bulky, it’s trivial to audit.
-There are a lot of simple files written using a number of simple rules.</p>
-<p>The idea is this.</p>
+There are a lot of simple files written using a few simple rules.</p>
+<p>Our first idea would play out like this:</p>
 <p>Each day will have a folder with a name that follows the YYYYMMDD pattern: <code class="docutils literal notranslate"><span class="pre">20180702</span></code> for example.</p>
 <p>Inside each day’s unique folder, there will be three files:</p>
 <ol class="arabic simple">
@@ -69,21 +78,98 @@ This is <span class="math notranslate nohighlight">\(D_t\)</span></li>
 It’s built as <span class="math notranslate nohighlight">\(S_{t} = D_t \cup S_{t-1}\)</span> each day.
 It can also be thought of as <span class="math notranslate nohighlight">\(S_{t} = \bigcup_t D_t\)</span>, the union of all previous daily files.</li>
 </ol>
-<p>The naming pattern of year-month-day is easy to visualize and reasonably popular.</p>
-<p>A common alternative is to use year-week-dow: <code class="docutils literal notranslate"><span class="pre">2018271</span></code> is the 2018, 27th week, 1st day. This
-makes it easier to clean out files that are over a week old and no longer useful for debugging
+<p>The naming pattern of year-month-day is easy to visualize and reasonably popular. It makes it easy to
+clear out a previous month’s files.</p>
+<p>A common alternative to year-month-day is to use year-week-dow: <code class="docutils literal notranslate"><span class="pre">2018271</span></code> is the 2018, 27th week, 1st day of the week.
+This pattern makes it easier to clean out files that are over a week old and no longer useful for debugging
 or audit purposes.</p>
 </div>
 <div class="section" id="multiple-dimensions">
 <h2>Multiple Dimensions<a class="headerlink" href="#multiple-dimensions" title="Permalink to this headline">¶</a></h2>
-<p>The focus above is on comparing a – single – daily extract with history. The file paths
-reflect date and state on a given date.</p>
-<p>The user story emphasizes multiple feeds. This leads to the following understanding of
-the data:</p>
+<p>The focus above is on comparing a single daily extract with history. The file paths
+reflect days and state on a given day.</p>
+<p>The user story mentions multiple feeds. This means we have dates as well as RSS channels.
+This leads to the following understanding of the data:</p>
 <img alt="_images/dimensions.png" src="_images/dimensions.png" />
 <p>A given item has two parents: the date and the RSS channel it came from.
 The two parents are independent dimensions – there’s no inherent hierarchical relationship between them.</p>
-<p>The OS file system, however, is hierarchical, forcing us to impose an arbitrary relationship between
+<p>The OS file system, however, is hierarchical. This forces us to impose an arbitrary relationship between
+channels and dates. There are two choices.</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">channel</span> <span class="pre">/</span> <span class="pre">date</span> <span class="pre">/</span> <span class="pre">*.csv</span></code> Each channel folder has a long string of date-based folders.
+Within each date’s folder are the relevant files. This makes it easy to see evolution of
+data within a channel.</li>
+<li><code class="docutils literal notranslate"><span class="pre">date</span> <span class="pre">/</span> <span class="pre">channel</span> <span class="pre">/</span> <span class="pre">*.csv</span></code> Each date has a collection of channel folders. Within each channel folder
+are the files for the given date and channel combination. This makes it easier to overview
+all channels on a given date.</li>
+</ul>
+<p>The “date-on-top” organization makes cleanup easier. Removing all files from the previous month (or previous
+week if using year-week-day) is trivial.
+..  _approach:</p>
+</div>
+</div>
+<div class="section" id="id2">
+<h1>Approach<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h1>
+<p>We’ll be gathering a set of items, some of which are new at a given point in time, and
+others of which are old. We need to partition the set to show only the new ones.</p>
+<p>This means computing a set difference between items for time, <span class="math notranslate nohighlight">\(t\)</span>, that are distinct
+from items for all previous times, <span class="math notranslate nohighlight">\(p\)</span>, such that <span class="math notranslate nohighlight">\(p &lt; t\)</span>.</p>
+<p>We can formalize the daily set, <span class="math notranslate nohighlight">\(D_t = \{i_0, i_1, i_2, ...\}\)</span>, as a set of individual
+items, <span class="math notranslate nohighlight">\(i_0\)</span>, <span class="math notranslate nohighlight">\(i_1\)</span>, etc.</p>
+<p>The history is the union of all previous daily sets, <span class="math notranslate nohighlight">\(S_{t-1} = \bigcup_{p \leq t-1} D_p\)</span>.</p>
+<p>The interesting data, then, is <span class="math notranslate nohighlight">\(D_t - S_{t-1}\)</span>. That is, <span class="math notranslate nohighlight">\(D_t - \bigcup_{p \leq t-1} D_p\)</span>.
+This can be restated as <span class="math notranslate nohighlight">\(\{i \in D_t \colon i \notin \bigcup_{p \leq t-1} D_p \}\)</span></p>
+<p>Since we run this daily, a sensible optimization is to save the history, updating it each day.
+To do this, we can start with some previously saved history, <span class="math notranslate nohighlight">\(S_t\)</span>, for some time, <span class="math notranslate nohighlight">\(t\)</span>.
+The base time, <span class="math notranslate nohighlight">\(t=0\)</span> will have an empty set of history, <span class="math notranslate nohighlight">\(S_0 = \emptyset\)</span>. A blank slate.</p>
+<p>Each day, we’re going to do three things.</p>
+<ol class="arabic simple">
+<li>Get the daily RSS feed, we can call it <span class="math notranslate nohighlight">\(D_t\)</span> for some time, <span class="math notranslate nohighlight">\(t &gt; 0\)</span>.
+The idea is that <span class="math notranslate nohighlight">\(t\)</span> is monotonically increasing.</li>
+<li>Compare the daily feed with saved history to see what’s new. This is <span class="math notranslate nohighlight">\(D_t - S_{t-1}\)</span>.</li>
+<li>Update the saved history. This is <span class="math notranslate nohighlight">\(S_{t} = D_t \cup S_{t-1}\)</span>.</li>
+</ol>
+<p>As a practical matter, the time parameter, <span class="math notranslate nohighlight">\(t\)</span>, is the current day.</p>
+<div class="section" id="id3">
+<h2>Core File Collection<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p>We have two overall approaches to saving a large and growing collection of data:</p>
+<ul class="simple">
+<li>Use <strong>one master file</strong> and keep updating that file with new items.</li>
+<li>Use <strong>a collection of files</strong> on a daily basis.</li>
+</ul>
+<p>The “One Master File” approach is appealing. You look in the file. You have the saved history and the recent changes.
+It’s awkward to debug and impossible to audit without a lot of additional information.
+This is the ideal for a highly-polished end-user-friendly desktop application. It’s – perhaps – a goal.
+Sadly, it’s not very simple to implement because intermediate state change information is lost.</p>
+<p>The “Collection of Files” approach creates a lot of small files. While it’s bulky, it’s trivial to audit.
+There are a lot of simple files written using a few simple rules.</p>
+<p>Our first idea would play out like this:</p>
+<p>Each day will have a folder with a name that follows the YYYYMMDD pattern: <code class="docutils literal notranslate"><span class="pre">20180702</span></code> for example.</p>
+<p>Inside each day’s unique folder, there will be three files:</p>
+<ol class="arabic simple">
+<li><code class="file docutils literal notranslate"><span class="pre">20180702/daily.csv</span></code> This is the daily download of RSS data, parsed and saved as a CSV file.
+This is <span class="math notranslate nohighlight">\(D_t\)</span></li>
+<li><code class="file docutils literal notranslate"><span class="pre">20180702/new.csv</span></code> This is the items which are new. <span class="math notranslate nohighlight">\(N_t = D_t - S_{t-1}\)</span></li>
+<li><code class="file docutils literal notranslate"><span class="pre">20180702/saved.csv</span></code> This is the accumulated history of items seen so far.
+It’s built as <span class="math notranslate nohighlight">\(S_{t} = D_t \cup S_{t-1}\)</span> each day.
+It can also be thought of as <span class="math notranslate nohighlight">\(S_{t} = \bigcup_t D_t\)</span>, the union of all previous daily files.</li>
+</ol>
+<p>The naming pattern of year-month-day is easy to visualize and reasonably popular. It makes it easy to
+clear out a previous month’s files.</p>
+<p>A common alternative to year-month-day is to use year-week-dow: <code class="docutils literal notranslate"><span class="pre">2018271</span></code> is the 2018, 27th week, 1st day of the week.
+This pattern makes it easier to clean out files that are over a week old and no longer useful for debugging
+or audit purposes.</p>
+</div>
+<div class="section" id="id4">
+<h2>Multiple Dimensions<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<p>The focus above is on comparing a single daily extract with history. The file paths
+reflect days and state on a given day.</p>
+<p>The user story mentions multiple feeds. This means we have dates as well as RSS channels.
+This leads to the following understanding of the data:</p>
+<img alt="_images/dimensions.png" src="_images/dimensions.png" />
+<p>A given item has two parents: the date and the RSS channel it came from.
+The two parents are independent dimensions – there’s no inherent hierarchical relationship between them.</p>
+<p>The OS file system, however, is hierarchical. This forces us to impose an arbitrary relationship between
 channels and dates. There are two choices.</p>
 <ul class="simple">
 <li><code class="docutils literal notranslate"><span class="pre">channel</span> <span class="pre">/</span> <span class="pre">date</span> <span class="pre">/</span> <span class="pre">*.csv</span></code> Each channel folder has a long string of date-based folders.
@@ -113,6 +199,25 @@ to see if we’re overwriting old files.</p>
 <p>If we use the date we actually run our software, we’ll see that the file isn’t changing.
 A file with a name like <code class="docutils literal notranslate"><span class="pre">20180702/channel/new.csv</span></code> will have reflect when we gathered the data. The content
 of the file may match the file from <code class="docutils literal notranslate"><span class="pre">20180701/channel/new.csv</span></code> showing that the feed is stale.</p>
+<p>The “channel-on-top” organization makes cleanup awkward because each channel must have last-month’s
+files cleaned separately.</p>
+</div>
+<div class="section" id="id5">
+<h2>Which Date?<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h2>
+<p>We have another tiny question regarding the applicable date for our files.</p>
+<p>Each RSS channel has a <code class="docutils literal notranslate"><span class="pre">lastBuildDate</span></code> tag with a time stamp for the RSS content.</p>
+<p>Which date do we use?</p>
+<ul class="simple">
+<li>The date we ran our software?</li>
+<li>The date provided in the RSS feed?</li>
+</ul>
+<p>If we use the RSS date, and an RSS feed is stale, we’ll tend to overwrite the same file
+with old data. There won’t be any easy way to check for staleness, though, because
+our application will overwrite an old file with old data. We can check the OS last-modified-date
+to see if we’re overwriting old files.</p>
+<p>If we use the date we actually run our software, we’ll see that the file isn’t changing.
+A file with a name like <code class="docutils literal notranslate"><span class="pre">20180702/channel/new.csv</span></code> will have reflect when we gathered the data. The content
+of the file may match the file from <code class="docutils literal notranslate"><span class="pre">20180701/channel/new.csv</span></code> showing that the feed is stale.</p>
 </div>
 </div>
 
@@ -127,7 +232,13 @@ of the file may match the file from <code class="docutils literal notranslate"><
 <li><a class="reference internal" href="#">Approach</a><ul>
 <li><a class="reference internal" href="#core-file-collection">Core File Collection</a></li>
 <li><a class="reference internal" href="#multiple-dimensions">Multiple Dimensions</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#id2">Approach</a><ul>
+<li><a class="reference internal" href="#id3">Core File Collection</a></li>
+<li><a class="reference internal" href="#id4">Multiple Dimensions</a></li>
 <li><a class="reference internal" href="#which-date">Which Date?</a></li>
+<li><a class="reference internal" href="#id5">Which Date?</a></li>
 </ul>
 </li>
 </ul>
