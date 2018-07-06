@@ -76,7 +76,7 @@ def title_transform(items: List[SourceRSS]) -> List[ExpandedRSS]:
     """
     A "transformation": this will parse titles for court docket RSS feeds.
 
-    >>> from xml_parsing import title_transform, SourceRSS, ExpandedRSS
+    >>> from rss_status import title_transform, SourceRSS, ExpandedRSS
 
     The data is a list witha  single document [SourceRSS()]
 
@@ -155,7 +155,7 @@ def path_maker(url: str, now: datetime.datetime=None, format: str="%Y%m%d") -> P
     An alternative can be ""%Y%W%w" to create a  YYYYWWw string,
     where WW is the week of the year and w is the day of the week.
 
-    >>> from xml_parsing import path_maker
+    >>> from rss_status import path_maker
     >>> import datetime
     >>> now = datetime.datetime(2018, 9, 10)
     >>> str(path_maker("https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl", now))
@@ -215,7 +215,9 @@ def channel_processing(url: str, directory: Path=None, date: datetime.datetime=N
     """
     The daily process for a given channel.
 
-    Ideally there's a "yesterday" directory. Pragmat
+    Ideally there's a "yesterday" directory. Pragmatically, this may not exist.
+    We use :func:`find_yesterday` to track down the most recent file and
+    work with that. If there's no recent file, this is all new. Welcome.
 
     :param url: The URL for the channel
     :param directory: The working directory, default is the current working directory.
@@ -230,7 +232,7 @@ def channel_processing(url: str, directory: Path=None, date: datetime.datetime=N
     yesterdays_path = find_yesterday(directory, url)
     todays_path = path_maker(url)
 
-    todays_data = xml_reader(url)
+    todays_data = title_transform(xml_reader(url))
     if yesterdays_path:
         saved_data = csv_load(yesterdays_path / "save.csv")
     else:
@@ -239,6 +241,7 @@ def channel_processing(url: str, directory: Path=None, date: datetime.datetime=N
     new_data = set(todays_data) - set(saved_data)
     all_data = set(todays_data) | set(saved_data)
 
+    todays_path.mkdir(parents=True, exist_ok=True)
     csv_dump(todays_data, todays_path / "daily.csv")
     csv_dump(new_data, todays_path / "new.csv")
     csv_dump(all_data, todays_path / "save.csv")
@@ -266,4 +269,10 @@ def demo():
 
 
 if __name__ == "__main__":
-    demo()
+    # demo()
+    for channel_url in (
+        "https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl",
+        "https://ecf.nyed.uscourts.gov/cgi-bin/readyDockets.pl",
+        # More channels here.
+    ):
+        channel_processing(channel_url)

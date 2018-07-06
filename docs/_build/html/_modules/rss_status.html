@@ -1,0 +1,356 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>rss_status &#8212; Simple RSS Status 1.0 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for rss_status</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Core XML Parsing of RSS documents. This is generally focused on RSS 2.0</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">from</span> <span class="nn">xml.etree</span> <span class="k">import</span> <span class="n">ElementTree</span>
+<span class="kn">from</span> <span class="nn">pprint</span> <span class="k">import</span> <span class="n">pprint</span>
+<span class="kn">import</span> <span class="nn">csv</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="k">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="k">import</span> <span class="n">urlparse</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">NamedTuple</span><span class="p">,</span> <span class="n">List</span>
+
+<div class="viewcode-block" id="SourceRSS"><a class="viewcode-back" href="../architecture.html#rss_status.SourceRSS">[docs]</a><span class="k">class</span> <span class="nc">SourceRSS</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Extract of raw RSS data&quot;&quot;&quot;</span>
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1">#: The title</span>
+    <span class="n">link</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1">#: The link</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1">#: The description</span>
+    <span class="n">pubDate</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1">#: The publication date</span></div>
+
+
+<div class="viewcode-block" id="ExpandedRSS"><a class="viewcode-back" href="../architecture.html#rss_status.ExpandedRSS">[docs]</a><span class="k">class</span> <span class="nc">ExpandedRSS</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Data expanded by the :func:`title_transform()` function.</span>
+
+<span class="sd">    Note that the names of the fields in this class will be the column</span>
+<span class="sd">    titles on saved CSV files. Any change here will be reflected in the files</span>
+<span class="sd">    created.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1">#: The title</span>
+    <span class="n">link</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1">#: The link</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1">#: The description</span>
+    <span class="n">pubDate</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1">#: The publication date</span>
+    <span class="n">docket</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1">#: The parsed docket from the title</span>
+    <span class="n">parties_title</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1">#: The parsed parties from the title</span></div>
+
+
+<div class="viewcode-block" id="xml_reader"><a class="viewcode-back" href="../architecture.html#rss_status.xml_reader">[docs]</a><span class="k">def</span> <span class="nf">xml_reader</span><span class="p">(</span><span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">SourceRSS</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extract RSS data given a URL to read.</span>
+
+<span class="sd">    The root document is the ``&lt;rss&gt;`` tag which has a single ``&lt;channel&gt;`` tag.</span>
+<span class="sd">    The ``&lt;channel&gt;`` has some overall attributes, but contains a sequence</span>
+<span class="sd">    of ``&lt;item&gt;`` tags.</span>
+
+<span class="sd">    This will gather &quot;title&quot;, &quot;link&quot;, &quot;description&quot;, and &quot;pubDate&quot; from each item</span>
+<span class="sd">    and build a :class:`SourceRSS` object.</span>
+
+<span class="sd">    It might be helpful to return the overall channel properties along with</span>
+<span class="sd">    the list of items.</span>
+
+<span class="sd">    :param url: URL to read.</span>
+<span class="sd">    :return: All of the SourceRSS from the channel of the feed, List[SourceRSS].</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">items</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="n">rss</span> <span class="o">=</span> <span class="n">ElementTree</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">content</span><span class="p">)</span>
+    <span class="n">channel</span> <span class="o">=</span> <span class="n">rss</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;channel&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Dump the overall channel properties</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="n">channel</span><span class="o">.</span><span class="n">findtext</span><span class="p">(</span><span class="s1">&#39;title&#39;</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;link&quot;</span><span class="p">,</span> <span class="n">channel</span><span class="o">.</span><span class="n">findtext</span><span class="p">(</span><span class="s1">&#39;link&#39;</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;description&quot;</span><span class="p">,</span> <span class="n">channel</span><span class="o">.</span><span class="n">findtext</span><span class="p">(</span><span class="s1">&#39;description&#39;</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;last build date&quot;</span><span class="p">,</span> <span class="n">channel</span><span class="o">.</span><span class="n">findtext</span><span class="p">(</span><span class="s1">&#39;lastBuildDate&#39;</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">channel</span><span class="o">.</span><span class="n">iter</span><span class="p">(</span><span class="s1">&#39;item&#39;</span><span class="p">):</span>
+        <span class="n">item_row</span> <span class="o">=</span> <span class="n">SourceRSS</span><span class="p">(</span>
+            <span class="n">title</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">findtext</span><span class="p">(</span><span class="s1">&#39;title&#39;</span><span class="p">),</span>
+            <span class="n">link</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">findtext</span><span class="p">(</span><span class="s1">&#39;link&#39;</span><span class="p">),</span>
+            <span class="n">description</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">findtext</span><span class="p">(</span><span class="s1">&#39;description&#39;</span><span class="p">),</span>
+            <span class="n">pubDate</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">findtext</span><span class="p">(</span><span class="s1">&#39;pubDate&#39;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item_row</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">items</span></div>
+
+<div class="viewcode-block" id="title_transform"><a class="viewcode-back" href="../architecture.html#rss_status.title_transform">[docs]</a><span class="k">def</span> <span class="nf">title_transform</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">SourceRSS</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">ExpandedRSS</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A &quot;transformation&quot;: this will parse titles for court docket RSS feeds.</span>
+
+<span class="sd">    &gt;&gt;&gt; from rss_status import title_transform, SourceRSS, ExpandedRSS</span>
+
+<span class="sd">    The data is a list witha  single document [SourceRSS()]</span>
+
+<span class="sd">    &gt;&gt;&gt; data = [</span>
+<span class="sd">    ... SourceRSS(</span>
+<span class="sd">    ...    title=&#39;1:15-cv-00791 SAVAGE  v. BURWELL et al&#39;,</span>
+<span class="sd">    ...    link=&#39;https://ecf.dcd.uscourts.gov/cgi-bin/DktRpt.pl?172013&#39;,</span>
+<span class="sd">    ...    description=&#39;[Reply to opposition to motion] (&lt;a href=&quot;https://ecf.dcd.uscourts.gov/doc1/04516660233?caseid=172013&amp;de_seq_num=555&quot; &gt;137&lt;/a&gt;)&#39;,</span>
+<span class="sd">    ...    pubDate=&#39;Thu, 05 Jul 2018 06:26:07 GMT&#39;</span>
+<span class="sd">    ... ),</span>
+<span class="sd">    ... ]</span>
+<span class="sd">    &gt;&gt;&gt; title_transform(data)</span>
+<span class="sd">    [ExpandedRSS(title=&#39;1:15-cv-00791 SAVAGE  v. BURWELL et al&#39;, link=&#39;https://ecf.dcd.uscourts.gov/cgi-bin/DktRpt.pl?172013&#39;, description=&#39;[Reply to opposition to motion] (&lt;a href=&quot;https://ecf.dcd.uscourts.gov/doc1/04516660233?caseid=172013&amp;de_seq_num=555&quot; &gt;137&lt;/a&gt;)&#39;, pubDate=&#39;Thu, 05 Jul 2018 06:26:07 GMT&#39;, docket=&#39;15-cv-00791&#39;, parties_title=&#39;SAVAGE  v. BURWELL et al&#39;)]</span>
+
+<span class="sd">    :param items: A list of :class:`SourceRSS` items built by :func:`xml_reader`</span>
+<span class="sd">    :return: A new list of :class:`ExpandedRSS`, with some additional attributes for each item.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">new_items</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
+        <span class="n">docket</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">parties_title</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">title</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">real_docket</span> <span class="o">=</span> <span class="n">docket</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">ExpandedRSS</span><span class="p">(</span>
+            <span class="n">title</span><span class="o">=</span><span class="n">row</span><span class="o">.</span><span class="n">title</span><span class="p">,</span>
+            <span class="n">link</span><span class="o">=</span><span class="n">row</span><span class="o">.</span><span class="n">link</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="n">row</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+            <span class="n">pubDate</span><span class="o">=</span><span class="n">row</span><span class="o">.</span><span class="n">pubDate</span><span class="p">,</span>
+            <span class="n">docket</span><span class="o">=</span><span class="n">real_docket</span><span class="p">,</span>
+            <span class="n">parties_title</span><span class="o">=</span><span class="n">parties_title</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">new_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">new_items</span></div>
+
+<div class="viewcode-block" id="csv_dump"><a class="viewcode-back" href="../architecture.html#rss_status.csv_dump">[docs]</a><span class="k">def</span> <span class="nf">csv_dump</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ExpandedRSS</span><span class="p">],</span> <span class="n">output_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Save expanded data to a file, given the Path.</span>
+
+<span class="sd">    Note that the headers are the field names from the ExpandedRSS class definition.</span>
+<span class="sd">    This assures us that all fields will be written properly.</span>
+
+<span class="sd">    :param data: List of :class:`ExpandedRSS` items, built by :func:`title_transform`.</span>
+<span class="sd">    :param output_path: Path to which to write the file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">output_path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">output_file</span> <span class="p">:</span>
+        <span class="n">headings</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ExpandedRSS</span><span class="o">.</span><span class="n">_fields</span><span class="p">)</span>
+        <span class="n">writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictWriter</span><span class="p">(</span><span class="n">output_file</span><span class="p">,</span> <span class="n">headings</span><span class="p">)</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">writeheader</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">_asdict</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="csv_load"><a class="viewcode-back" href="../architecture.html#rss_status.csv_load">[docs]</a><span class="k">def</span> <span class="nf">csv_load</span><span class="p">(</span><span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">ExpandedRSS</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Recover expanded data from a file, given a Path.</span>
+
+<span class="sd">    Note that the headers **must be** the field names from the ExpandedRSS class definition.</span>
+<span class="sd">    If their isn&#39;t a trivial match, then this won&#39;t read properly.</span>
+
+<span class="sd">    :param input_path: Path from which to read the file.</span>
+<span class="sd">    :returns: List of ExpandedRSS objects used to compare previous day&#39;s feed</span>
+<span class="sd">        with today&#39;s feed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">with</span> <span class="n">input_path</span><span class="o">.</span><span class="n">open</span><span class="p">()</span> <span class="k">as</span> <span class="n">input_file</span><span class="p">:</span>
+        <span class="n">reader</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="n">input_file</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">reader</span><span class="p">:</span>
+            <span class="n">expanded_rss</span> <span class="o">=</span> <span class="n">ExpandedRSS</span><span class="p">(</span><span class="o">**</span><span class="n">row</span><span class="p">)</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">expanded_rss</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="path_maker"><a class="viewcode-back" href="../architecture.html#rss_status.path_maker">[docs]</a><span class="k">def</span> <span class="nf">path_maker</span><span class="p">(</span><span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">now</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">format</span><span class="p">:</span> <span class="nb">str</span><span class="o">=</span><span class="s2">&quot;%Y%m</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Builds a Path from today&#39;s date and the base name of the URL.</span>
+
+<span class="sd">    The default format is &quot;%Y%m%d&quot; to transform the date to a YYYYmmdd string.</span>
+<span class="sd">    An alternative can be &quot;&quot;%Y%W%w&quot; to create a  YYYYWWw string,</span>
+<span class="sd">    where WW is the week of the year and w is the day of the week.</span>
+
+<span class="sd">    &gt;&gt;&gt; from rss_status import path_maker</span>
+<span class="sd">    &gt;&gt;&gt; import datetime</span>
+<span class="sd">    &gt;&gt;&gt; now = datetime.datetime(2018, 9, 10)</span>
+<span class="sd">    &gt;&gt;&gt; str(path_maker(&quot;https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl&quot;, now))</span>
+<span class="sd">    &#39;20180910/rss_outside&#39;</span>
+
+<span class="sd">    :param url: An RSS-feed URL.</span>
+<span class="sd">    :param now: Optional date/time object. Defaults to datetime.datetime.now().</span>
+<span class="sd">    :return: A Path with the date string / base name from the URL.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">url_details</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="n">base_name</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">url_details</span><span class="o">.</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">now</span><span class="p">:</span>
+        <span class="n">now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+    <span class="n">today_str</span> <span class="o">=</span> <span class="n">now</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="nb">format</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">today_str</span><span class="p">)</span> <span class="o">/</span> <span class="n">base_name</span></div>
+
+
+<div class="viewcode-block" id="find_yesterday"><a class="viewcode-back" href="../architecture.html#rss_status.find_yesterday">[docs]</a><span class="k">def</span> <span class="nf">find_yesterday</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">date_pattern</span><span class="p">:</span> <span class="nb">str</span><span class="o">=</span><span class="s1">&#39;[0-9]*&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    We need to search for the most recent previous entry. While we can hope for</span>
+<span class="sd">    dependably running this every day, that&#39;s a difficult thing to guarantee.</span>
+
+<span class="sd">    It&#39;s much more reliable to look for the most recent date which</span>
+<span class="sd">    contains files for a given channel. This means</span>
+
+<span class="sd">    Example. Here&#39;s two dates. One date has one channel, the other has two channels.</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        20180630/one_channel/daily.csv</span>
+<span class="sd">        20180630/one_channel/new.csv</span>
+<span class="sd">        20180630/one_channel/save.csv</span>
+<span class="sd">        20180701/one_channel/daily.csv</span>
+<span class="sd">        20180701/one_channel/new.csv</span>
+<span class="sd">        20180701/one_channel/save.csv</span>
+<span class="sd">        20180701/another_channel/daily.csv</span>
+<span class="sd">        20180701/another_channel/new.csv</span>
+<span class="sd">        20180701/another_channel/save.csv</span>
+
+<span class="sd">    If there&#39;s nothing available, returns None.</span>
+
+<span class="sd">    :param directory: The base directory to search</span>
+<span class="sd">    :param url: The full URL from which we can get the base name</span>
+<span class="sd">    :param date_pattern: Most of the time, the interesting filenames will begin with a digit</span>
+<span class="sd">        If the file name pattern is changed, however, this can be used to match dates,</span>
+<span class="sd">        and exclude non-date files that might be confusing.</span>
+<span class="sd">    :return: A Path with the date string / base name from the URL or None.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">url_details</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="n">base_name</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">url_details</span><span class="o">.</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+    <span class="n">candidates</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">directory</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;</span><span class="si">{date_pattern}</span><span class="s2">/</span><span class="si">{base_name}</span><span class="s2">&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">candidates</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">candidates</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="channel_processing"><a class="viewcode-back" href="../architecture.html#rss_status.channel_processing">[docs]</a><span class="k">def</span> <span class="nf">channel_processing</span><span class="p">(</span><span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">directory</span><span class="p">:</span> <span class="n">Path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">date</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The daily process for a given channel.</span>
+
+<span class="sd">    Ideally there&#39;s a &quot;yesterday&quot; directory. Pragmatically, this may not exist.</span>
+<span class="sd">    We use :func:`find_yesterday` to track down the most recent file and</span>
+<span class="sd">    work with that. If there&#39;s no recent file, this is all new. Welcome.</span>
+
+<span class="sd">    :param url: The URL for the channel</span>
+<span class="sd">    :param directory: The working directory, default is the current working directory.</span>
+<span class="sd">    :param date: The date to assign to the files, by default, it&#39;s datetime.datetime.now.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">directory</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">date</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">date</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+
+    <span class="n">yesterdays_path</span> <span class="o">=</span> <span class="n">find_yesterday</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+    <span class="n">todays_path</span> <span class="o">=</span> <span class="n">path_maker</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+
+    <span class="n">todays_data</span> <span class="o">=</span> <span class="n">title_transform</span><span class="p">(</span><span class="n">xml_reader</span><span class="p">(</span><span class="n">url</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">yesterdays_path</span><span class="p">:</span>
+        <span class="n">saved_data</span> <span class="o">=</span> <span class="n">csv_load</span><span class="p">(</span><span class="n">yesterdays_path</span> <span class="o">/</span> <span class="s2">&quot;save.csv&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">saved_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">new_data</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">todays_data</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">saved_data</span><span class="p">)</span>
+    <span class="n">all_data</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">todays_data</span><span class="p">)</span> <span class="o">|</span> <span class="nb">set</span><span class="p">(</span><span class="n">saved_data</span><span class="p">)</span>
+
+    <span class="n">todays_path</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">csv_dump</span><span class="p">(</span><span class="n">todays_data</span><span class="p">,</span> <span class="n">todays_path</span> <span class="o">/</span> <span class="s2">&quot;daily.csv&quot;</span><span class="p">)</span>
+    <span class="n">csv_dump</span><span class="p">(</span><span class="n">new_data</span><span class="p">,</span> <span class="n">todays_path</span> <span class="o">/</span> <span class="s2">&quot;new.csv&quot;</span><span class="p">)</span>
+    <span class="n">csv_dump</span><span class="p">(</span><span class="n">all_data</span><span class="p">,</span> <span class="n">todays_path</span> <span class="o">/</span> <span class="s2">&quot;save.csv&quot;</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">demo</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This is downloads, enriches, and saves the daily files to the current</span>
+<span class="sd">    working directory.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">target_path</span> <span class="o">=</span> <span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span>
+
+    <span class="n">data1</span> <span class="o">=</span> <span class="n">xml_reader</span><span class="p">(</span><span class="s2">&quot;https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl&quot;</span><span class="p">)</span>
+    <span class="n">data1_decomposed</span> <span class="o">=</span> <span class="n">title_transform</span><span class="p">(</span><span class="n">data1</span><span class="p">)</span>
+    <span class="c1"># pprint(data1_decomposed)</span>
+    <span class="n">csv_dump</span><span class="p">(</span><span class="n">data1_decomposed</span><span class="p">,</span> <span class="n">target_path</span> <span class="o">/</span> <span class="s2">&quot;file1.csv&quot;</span><span class="p">)</span>
+
+    <span class="n">data2</span> <span class="o">=</span> <span class="n">xml_reader</span><span class="p">(</span><span class="s2">&quot;https://ecf.nyed.uscourts.gov/cgi-bin/readyDockets.pl&quot;</span><span class="p">)</span>
+    <span class="n">data2_decomposed</span> <span class="o">=</span> <span class="n">title_transform</span><span class="p">(</span><span class="n">data2</span><span class="p">)</span>
+    <span class="c1"># pprint(data2_decomposed)</span>
+    <span class="n">csv_dump</span><span class="p">(</span><span class="n">data2_decomposed</span><span class="p">,</span> <span class="n">target_path</span> <span class="o">/</span> <span class="s2">&quot;file2.csv&quot;</span><span class="p">)</span>
+
+    <span class="n">recovered</span> <span class="o">=</span> <span class="n">csv_load</span><span class="p">(</span><span class="n">target_path</span> <span class="o">/</span> <span class="s2">&quot;file2.csv&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="nb">set</span><span class="p">(</span><span class="n">recovered</span><span class="p">)</span> <span class="o">==</span> <span class="nb">set</span><span class="p">(</span><span class="n">data2_decomposed</span><span class="p">),</span> <span class="s2">&quot;Weird, recovering the file was a problem.&quot;</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="c1"># demo()</span>
+    <span class="k">for</span> <span class="n">channel_url</span> <span class="ow">in</span> <span class="p">(</span>
+        <span class="s2">&quot;https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;https://ecf.nyed.uscourts.gov/cgi-bin/readyDockets.pl&quot;</span><span class="p">,</span>
+        <span class="c1"># More channels here.</span>
+    <span class="p">):</span>
+        <span class="n">channel_processing</span><span class="p">(</span><span class="n">channel_url</span><span class="p">)</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, S.Lott.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -69,7 +69,7 @@ is to create a series of bytes that represent a Python object. The source data
 was serialized in XML notation; we parse that to recover Python objects. The working
 data is serialized in CSV notation; we load and dump those files.
 
-.. py:module:: xml_parsing
+.. py:module:: rss_status
 
 Core Data Structures
 --------------------
@@ -137,10 +137,10 @@ We have two choices for working with the mutable results of reading CSV files.
 The transmogrification approach leads us to building a named tuple object
 for each CSV row.
 
-..  autoclass:: xml_parsing.SourceRSS
+..  autoclass:: rss_status.SourceRSS
     :members:
 
-..  autoclass:: xml_parsing.ExpandedRSS
+..  autoclass:: rss_status.ExpandedRSS
     :members:
 
 
@@ -150,7 +150,7 @@ XML Parsing
 XML parsing is handled gracefully by Python's :mod:`xml` package. There are several
 parses, the :mod:`xml.etree` is particularly nice, and provides a wealth of features.
 
-..  autofunction::   xml_parsing.xml_reader
+..  autofunction::   rss_status.xml_reader
 
 
 Creating Working Paths
@@ -159,13 +159,13 @@ Creating Working Paths
 We have two dimensions to the paths. The :func:`path_maker` function will
 honor this by using a name from the URL and today's date.
 
-..  autofunction:: xml_parsing.path_maker
+..  autofunction:: rss_status.path_maker
 
 What about yesterday's files?  We can't simply subtract one day from today's date.
 For that to work, we'd have to religiously run this **every single day**. That's unreasonable.
 What's easier is locating the most recent date which contains files for a given channel.
 
-..  autofunction:: xml_parsing.find_yesterday
+..  autofunction:: rss_status.find_yesterday
 
 Saving and Recovering CSV State
 -------------------------------
@@ -174,9 +174,9 @@ These two functions will save and restore collections of :class:`ExpandedRSS` ob
 We use the names "dump" and "load" to be consistent with other serialization packages.
 We could use ``json.dump()`` or ``yaml.dump()`` instead of writing in CSV notation.
 
-..  autofunction:: xml_parsing.csv_dump
+..  autofunction:: rss_status.csv_dump
 
-..  autofunction:: xml_parsing.csv_load
+..  autofunction:: rss_status.csv_load
 
 Transformations
 ---------------
@@ -184,7 +184,7 @@ Transformations
 Currently, we only have one transformation, from :class:`SourceRSS` to
 :class:`ExpandedRSS`.
 
-..  autofunction:: xml_parsing.title_transform
+..  autofunction:: rss_status.title_transform
 
 In the long run, there will be additional transformations.
 
@@ -197,3 +197,27 @@ The current design has two elements combined together.
 
 In the longer run (see :ref:`expansions`) this needs to be refactored to allow
 multiple transformation processes to be combined by an over-arching transformation pipeline.
+
+Composite Processing for One Channel
+------------------------------------
+
+The core channel processing is a function that captures data into CSV files.
+
+..  autofunction:: rss_status.channel_processing
+
+This can lead to a main program like this:
+
+::
+
+    working_directory = Path.home() / "rss_feed" / "data"
+    for channel_url in (
+        "https://ecf.dcd.uscourts.gov/cgi-bin/rss_outside.pl",
+        "https://ecf.nyed.uscourts.gov/cgi-bin/readyDockets.pl",
+        # More channels here.
+    ):
+        channel_processing(channel_url, working_directory)
+
+The configuration is relatively simple and easy-to-see because it's right there in the script.
+
+In some cases, we might want more elaborate command-line processing. In which case,
+we can use the http://click.pocoo.org/5/ to build a more sophisticated command-line interface.

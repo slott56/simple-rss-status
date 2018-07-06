@@ -39,26 +39,94 @@
 <div>As a journalist, I want to parse titles and descriptions of RSS feeds to extract
 additional data encoded there so I can make better use of the available
 information.</div></blockquote>
-<p>Practically, the <a class="reference internal" href="architecture.html#xml_parsing.title_transform" title="xml_parsing.title_transform"><code class="xref py py-func docutils literal notranslate"><span class="pre">xml_parsing.title_transform()</span></code></a> function is an instance of the above
-general pattern. This function decomposes the title into docket and parties. There are more nuggets
-of goodness buried in the description.</p>
-<p>How do we expand the transformation steps? There are several parts to this:</p>
-<ul>
-<li><p class="first">Things we do to the code.</p>
-<ol class="arabic simple">
-<li>Write the additional <strong>transform</strong> functions to parse the description.</li>
-<li>Test the function in isolation.</li>
-<li>Expand the <a class="reference internal" href="architecture.html#xml_parsing.ExpandedRSS" title="xml_parsing.ExpandedRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">xml_parsing.ExpandedRSS</span></code></a> to include the additional attributes.</li>
-<li>Revise the overall processing flow to</li>
+<p>This suffers from a vagueness problem. See <a class="reference external" href="https://xp123.com/articles/invest-in-good-stories-and-smart-tasks/">https://xp123.com/articles/invest-in-good-stories-and-smart-tasks/</a>
+for help on decomposing this generic, meta-story into specific stories.
+Also see <a class="reference external" href="https://agileforall.com/patterns-for-splitting-user-stories/">https://agileforall.com/patterns-for-splitting-user-stories/</a> for more guidance
+on decomposition of complexity.</p>
+<p>Practically, the <a class="reference internal" href="architecture.html#rss_status.title_transform" title="rss_status.title_transform"><code class="xref py py-func docutils literal notranslate"><span class="pre">rss_status.title_transform()</span></code></a> function is a single concrete instance of the above
+general story pattern. This function decomposes the title into docket and parties. There are more nuggets
+of goodness buried in the description property of the RSS item.</p>
+<p>There’s a tiny problem with this function. We’ll look at two versions of adding transformations.
+The first way to add transformations is simple and applies to the case were a few, very simple things need to be
+done. Emphasis on “few”.</p>
+<p>Then we’ll look at a more sophisticated rewrite that might be in order.</p>
+<div class="section" id="simple-expansion">
+<h2>Simple Expansion<a class="headerlink" href="#simple-expansion" title="Permalink to this headline">¶</a></h2>
+<p>How do we expand the transformation steps? There are several parts to making a few, simple changes:</p>
+<ol class="arabic">
+<li><p class="first">Write the additional <strong>transform</strong> steps inside the <a class="reference internal" href="architecture.html#rss_status.title_transform" title="rss_status.title_transform"><code class="xref py py-func docutils literal notranslate"><span class="pre">rss_status.title_transform()</span></code></a> function.</p>
+<p>Right now, the code looks like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">docket</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">parties_title</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">title</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">real_docket</span> <span class="o">=</span> <span class="n">docket</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Which partitions the title on a space, and the partitions the docket on a <code class="docutils literal notranslate"><span class="pre">`&quot;:&quot;</span></code>.</p>
+</li>
+<li><p class="first">Test the function in isolation. This is best done with examples, as shown in
+the <a class="reference internal" href="architecture.html#rss_status.title_transform" title="rss_status.title_transform"><code class="xref py py-func docutils literal notranslate"><span class="pre">rss_status.title_transform()</span></code></a> function. The Python doctest tool
+can confirm the example is correct.</p>
+<p>Here’s the OS-level command that runs doctest.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>slott$ python3 -m doctest -v rss_status.py
+</pre></div>
+</div>
+<p>Here’s the bottom two lines of the output.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">7</span> <span class="n">passed</span> <span class="ow">and</span> <span class="mi">0</span> <span class="n">failed</span><span class="o">.</span>
+<span class="n">Test</span> <span class="n">passed</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>All of the examples worked as predicted.</p>
+</li>
+<li><p class="first">Expand the <a class="reference internal" href="architecture.html#rss_status.ExpandedRSS" title="rss_status.ExpandedRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">rss_status.ExpandedRSS</span></code></a> class to include the additional attributes
+built by the new <strong>transform</strong> function(s).</p>
+</li>
 </ol>
-</li>
-<li><p class="first">Things we do operationally to make it work.</p>
-<p>Here’s the essential problem:</p>
-<blockquote>
-<div><p>The previous day’s data will be incomplete with respect to the new transformation process.</p>
-</div></blockquote>
-</li>
-</ul>
+<p>Because the structure of the <a class="reference internal" href="architecture.html#rss_status.ExpandedRSS" title="rss_status.ExpandedRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">rss_status.ExpandedRSS</span></code></a> class has changed, the next daily
+feed will appear to be entirely new. And – clearly – the new data items make it appear all new.
+There are ways to limit the scope of comparison to check for newness, but the problem of
+“it appears all new after I made a change” doesn’t appear to be large enough to yield significant
+benefit from additional complexity.</p>
+</div>
+<div class="section" id="more-sophistication">
+<h2>More Sophistication<a class="headerlink" href="#more-sophistication" title="Permalink to this headline">¶</a></h2>
+<p>The <a class="reference internal" href="architecture.html#rss_status.title_transform" title="rss_status.title_transform"><code class="xref py py-func docutils literal notranslate"><span class="pre">rss_status.title_transform()</span></code></a> function does two things.</p>
+<ol class="arabic simple">
+<li>It builds a list of <a class="reference internal" href="architecture.html#rss_status.ExpandedRSS" title="rss_status.ExpandedRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">rss_status.ExpandedRSS</span></code></a> items.</li>
+<li>It applies a series of transformational steps to each <a class="reference internal" href="architecture.html#rss_status.SourceRSS" title="rss_status.SourceRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">rss_status.SourceRSS</span></code></a> item to
+create the resulting <a class="reference internal" href="architecture.html#rss_status.ExpandedRSS" title="rss_status.ExpandedRSS"><code class="xref py py-class docutils literal notranslate"><span class="pre">rss_status.ExpandedRSS</span></code></a> items.</li>
+</ol>
+<p>We can refactor the function to break it into poeces and make it quite a bit easier to expand.</p>
+<p>First. The list-building is really this.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">todays_data</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">transform</span><span class="p">(</span><span class="n">xml_reader</span><span class="p">(</span><span class="n">url</span><span class="p">)))</span>
+</pre></div>
+</div>
+<p>This depends on a new <code class="xref py py-func docutils literal notranslate"><span class="pre">transform()</span></code> function.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">SourceRSS</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">ExpandedRSS</span><span class="p">]:</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">source</span><span class="p">:</span>
+        <span class="n">parties_title</span><span class="p">,</span> <span class="n">real_docket</span> <span class="o">=</span> <span class="n">title_parse</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">title</span><span class="p">)</span>
+        <span class="c1"># other extraction goes here</span>
+        <span class="k">yield</span> <span class="n">ExpandedRSS</span><span class="p">(</span>
+            <span class="n">title</span><span class="o">=</span><span class="n">row</span><span class="o">.</span><span class="n">title</span><span class="p">,</span>
+            <span class="n">link</span><span class="o">=</span><span class="n">row</span><span class="o">.</span><span class="n">link</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="n">row</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+            <span class="n">pubDate</span><span class="o">=</span><span class="n">row</span><span class="o">.</span><span class="n">pubDate</span><span class="p">,</span>
+            <span class="n">docket</span><span class="o">=</span><span class="n">real_docket</span><span class="p">,</span>
+            <span class="n">parties_title</span><span class="o">=</span><span class="n">parties_title</span><span class="p">,</span>
+            <span class="c1"># Other field values go here</span>
+        <span class="p">)</span>
+</pre></div>
+</div>
+<p>The <code class="xref py py-func docutils literal notranslate"><span class="pre">title_parse()</span></code> function looks like this.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">title_parse</span><span class="p">(</span><span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+    <span class="n">docket</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">parties_title</span> <span class="o">=</span> <span class="n">title</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">real_docket</span> <span class="o">=</span> <span class="n">docket</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parties_title</span><span class="p">,</span> <span class="n">real_docket</span>
+</pre></div>
+</div>
+<p>We can now easily add more things that are like <code class="xref py py-func docutils literal notranslate"><span class="pre">title_parse()</span></code>.</p>
+<p>Since this is so small, it’s easy to test in isolation. We can write many
+functions like this, and bundle them into the overall <code class="xref py py-func docutils literal notranslate"><span class="pre">transform()</span></code> function
+to add additional, derived attributes of each item.</p>
+</div>
 </div>
 
 
@@ -66,7 +134,16 @@ of goodness buried in the description.</p>
         </div>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper"><div class="relations">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Expansions</a><ul>
+<li><a class="reference internal" href="#simple-expansion">Simple Expansion</a></li>
+<li><a class="reference internal" href="#more-sophistication">More Sophistication</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
